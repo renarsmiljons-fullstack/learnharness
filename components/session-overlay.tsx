@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { MaximizeIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fitGraphView, fitZoomFor, zoomedGraphView, type Viewport } from "@/components/pan-zoom";
+import { usePinchZoom } from "@/components/use-pinch-zoom";
 import { renderMermaid } from "@/components/mermaid-render";
 import { MermaidError } from "@/components/mermaid-error";
 import { Hint } from "@/components/ui/hint";
@@ -173,10 +174,26 @@ export function MermaidOverlay({
 	}, [fitZoom, box, size]);
 
 	const dragRef = useRef<{ px: number; py: number; x: number; y: number; moved: boolean } | null>(null);
+	// Touch: two-finger pinch zooms around the fingers' midpoint and pans
+	// with it; the one-finger drag stands down while a pinch runs.
+	const pinchingRef = usePinchZoom(viewportRef, {
+		onStart: () => {
+			dragRef.current = null;
+			setPanning(true);
+		},
+		onPinch: ({ factor, focus, dx, dy }) => {
+			userAdjustedRef.current = true;
+			setView((v) => {
+				const z = zoomedGraphView(v, factor, fitZoom, focus, box, size);
+				return z.zoom <= fitZoom + 1e-9 ? z : { ...z, x: z.x + dx, y: z.y + dy };
+			});
+		},
+		onEnd: () => setPanning(false),
+	});
 	const startDrag = (e: React.PointerEvent<HTMLDivElement>) => {
 		if (e.button !== 0) return;
 		if ((e.target as HTMLElement).closest("button")) return;
-		if (atFloor) return;
+		if (atFloor || pinchingRef.current) return;
 		dragRef.current = { px: e.clientX, py: e.clientY, x: view.x, y: view.y, moved: false };
 		setPanning(true);
 		e.currentTarget.classList.add("cursor-grabbing");
@@ -184,7 +201,7 @@ export function MermaidOverlay({
 	};
 	const moveDrag = (e: React.PointerEvent<HTMLDivElement>) => {
 		const d = dragRef.current;
-		if (!d) return;
+		if (!d || pinchingRef.current) return;
 		d.moved = true;
 		setView((v) =>
 			v.zoom <= fitZoom + 1e-9 ? v : { ...v, x: d.x + (e.clientX - d.px), y: d.y + (e.clientY - d.py) },
@@ -290,7 +307,8 @@ export function MermaidOverlay({
 							)}
 						</div>
 						<div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between p-2">
-							<span className="text-xs text-muted-foreground/60">Drag to pan · scroll to zoom</span>
+							<span className="text-xs text-muted-foreground/60 pointer-coarse:hidden">Drag to pan · scroll to zoom</span>
+							<span className="hidden text-xs text-muted-foreground/60 pointer-coarse:inline">Drag to pan · pinch to zoom</span>
 							<div className="flex gap-1">
 								<Hint label="Zoom out" side="bottom">
 <button

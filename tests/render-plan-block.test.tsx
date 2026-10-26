@@ -275,7 +275,7 @@ describe("plan popup (live derivation)", () => {
 		const whiteHeads = (html.match(/marker-end="url\(#(?:R\d+|[a-z0-9-]+)\)"/g) ?? []).length;
 		assert.equal(dimHeads, 1, "the gray-origin edge dims");
 		assert.equal(whiteHeads, 1, "the both-white edge stays white");
-		assert.match(html, /<path[^>]*class="fill-none stroke-border"/);
+		assert.match(html, /<path[^>]*class="fill-none stroke-\[#6e6e6e\]"/);
 		assert.match(html, /<path[^>]*class="fill-none stroke-white"/);
 	});
 

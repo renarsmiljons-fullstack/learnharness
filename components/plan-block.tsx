@@ -13,6 +13,7 @@ import { layout as dagreLayout } from "dagre-d3-es/src/dagre/index.js";
 // d3's curveBasis (the exact recipe dagre-d3's own renderer uses).
 import { curveBasis, line } from "d3-shape";
 import { fitGraphView, fitZoomFor, zoomedGraphView, type Viewport } from "@/components/pan-zoom";
+import { usePinchZoom } from "@/components/use-pinch-zoom";
 import type { PlanBlockData, PlanNodeStatus, PlanTree } from "@/src/core";
 import { derivedNodeStatus, derivePlanStatuses } from "@/src/core";
 import { Hint } from "@/components/ui/hint";
@@ -449,13 +450,15 @@ const BOX: Record<PlanNodeStatus, string> = {
 	// half, not shown straight through (owner, round 9).
 	visited: "fill-background/50 stroke-white",
 	current: "fill-background/50 stroke-white",
-	// The grayed-out not-yet-visited look stays as-is (owner).
-	upcoming: "fill-card stroke-border",
+	// Not-yet-visited stays gray, but a readable mid-gray: the border token
+	// (#434343 on ~#141414, ~1.9:1) made a fresh plan nearly invisible,
+	// especially on a phone.
+	upcoming: "fill-card stroke-[#7d7d7d]",
 };
 const TEXT: Record<PlanNodeStatus, string> = {
 	visited: "fill-white text-xs",
 	current: "fill-white text-xs font-medium",
-	upcoming: "fill-muted-foreground/80 text-xs",
+	upcoming: "fill-[#c4c4c4] text-xs",
 };
 // The in-chat block speaks the dock language now (owner, plan-hug
 // round 2026-10-07): boxes in the lighter background variant like
@@ -569,7 +572,7 @@ export function PlanDiagram({
 					markerUnits="userSpaceOnUse"
 					orient="auto"
 				>
-					<path d={ARROW_HEAD} className="fill-border" />
+					<path d={ARROW_HEAD} className="fill-[#6e6e6e]" />
 				</marker>
 				{/* The current node's highlight: a faint yellow fill BLURRED so it
 				    bleeds out over the node's edges (owner). Generous filter region
@@ -604,7 +607,7 @@ export function PlanDiagram({
 					<path
 						key={`${e.from}->${e.to}`}
 						d={edgePathD(pts, target)}
-						className={dim ? "fill-none stroke-border" : "fill-none stroke-white"}
+						className={dim ? "fill-none stroke-[#6e6e6e]" : "fill-none stroke-white"}
 						strokeWidth={STROKE_W}
 						markerEnd={`url(#${markerId}${dim ? "-dim" : ""})`}
 					/>
@@ -840,10 +843,26 @@ export function PlanPopup({ messages, onClose }: { messages: readonly PopupMessa
 	// per-frame — the transition is off while dragging or it rubber-bands.
 	const [panning, setPanning] = useState(false);
 	const dragRef = useRef<{ px: number; py: number; x: number; y: number; moved: boolean } | null>(null);
+	// Touch: two-finger pinch zooms around the fingers' midpoint and pans
+	// with it; the one-finger drag stands down while a pinch runs.
+	const pinchingRef = usePinchZoom(viewportRef, {
+		onStart: () => {
+			dragRef.current = null;
+			setPanning(true);
+		},
+		onPinch: ({ factor, focus, dx, dy }) => {
+			userAdjustedRef.current = true;
+			setView((v) => {
+				const z = zoomedGraphView(v, factor, fitZoom, focus, box, size);
+				return z.zoom <= fitZoom + 1e-9 ? z : { ...z, x: z.x + dx, y: z.y + dy };
+			});
+		},
+		onEnd: () => setPanning(false),
+	});
 	const startDrag = (e: React.PointerEvent<HTMLDivElement>) => {
 		if (e.button !== 0) return;
 		if ((e.target as HTMLElement).closest("button")) return;
-		if (atFloor) return;
+		if (atFloor || pinchingRef.current) return;
 		dragRef.current = { px: e.clientX, py: e.clientY, x: view.x, y: view.y, moved: false };
 		setPanning(true);
 		e.currentTarget.classList.add("cursor-grabbing");
@@ -851,7 +870,7 @@ export function PlanPopup({ messages, onClose }: { messages: readonly PopupMessa
 	};
 	const moveDrag = (e: React.PointerEvent<HTMLDivElement>) => {
 		const d = dragRef.current;
-		if (!d) return;
+		if (!d || pinchingRef.current) return;
 		d.moved = true;
 		setView((v) =>
 			v.zoom <= fitZoom + 1e-9 ? v : { ...v, x: d.x + (e.clientX - d.px), y: d.y + (e.clientY - d.py) },
@@ -910,7 +929,7 @@ export function PlanPopup({ messages, onClose }: { messages: readonly PopupMessa
 			<div
 				ref={viewportRef}
 				className={cn(
-					"relative min-h-0 flex-1 touch-none overflow-hidden rounded-xl border select-none",
+					"relative min-h-0 flex-1 touch-none overflow-hidden rounded-xl border bg-background select-none",
 					atFloor ? "cursor-default" : "cursor-grab",
 				)}
 				onPointerDown={startDrag}
@@ -947,7 +966,8 @@ export function PlanPopup({ messages, onClose }: { messages: readonly PopupMessa
 							/>
 						</div>
 						<div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between p-2">
-							<span className="text-xs text-muted-foreground/60">Drag to pan · scroll to zoom</span>
+							<span className="text-xs text-muted-foreground/60 pointer-coarse:hidden">Drag to pan · scroll to zoom</span>
+							<span className="hidden text-xs text-muted-foreground/60 pointer-coarse:inline">Drag to pan · pinch to zoom</span>
 							<div className="flex gap-1">
 								<Hint label="Zoom out" side="bottom">
 <button
