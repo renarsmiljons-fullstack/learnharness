@@ -267,11 +267,11 @@ export function SettingsDialogBody({
 			aria-modal="true"
 			aria-label="Settings"
 			data-testid="settings-dialog"
-			className="settings-dialog-pop flex h-[620px] max-h-[85vh] w-[920px] max-w-[90vw] flex-col overflow-hidden rounded-md border border-border bg-card shadow-xl"
+			className="settings-dialog-pop flex h-dvh max-h-dvh w-full flex-col overflow-hidden border-border bg-card shadow-xl md:h-[620px] md:max-h-[85vh] md:w-[920px] md:max-w-[90vw] md:rounded-md md:border"
 			onClick={(e) => e.stopPropagation()}
 		>
 			{/* Header — the app's quiet CMU title language. */}
-			<header className="flex h-15 shrink-0 items-center gap-3 border-b border-border px-5">
+			<header className="flex h-15 shrink-0 items-center gap-3 border-b border-border px-5 pt-[env(safe-area-inset-top)]">
 				<h2 className="font-title text-2xl tracking-tight">Settings</h2>
 				<Hint
 						// Esc closes the dialog (its own listener) — surface it.
@@ -299,13 +299,13 @@ export function SettingsDialogBody({
 					</Hint>
 			</header>
 
-			<div className="flex min-h-0 flex-1">
+			<div className="flex min-h-0 flex-1 flex-col md:flex-row">
 				{/* Left nav — text-only, the session-list mono language,
 					    active = bg-accent. */}
 				<nav
 					aria-label="Settings sections"
 					data-testid="settings-nav"
-					className="flex w-44 shrink-0 flex-col gap-1 border-r border-border p-2"
+					className="flex shrink-0 gap-1 overflow-x-auto border-b border-border p-2 md:w-44 md:flex-col md:overflow-visible md:border-r md:border-b-0"
 				>
 					{SECTIONS.map((s) => (
 						<button
@@ -313,7 +313,7 @@ export function SettingsDialogBody({
 							type="button"
 							data-testid={`settings-nav-${s.id}`}
 							aria-current={active === s.id}
-							className={`rounded-sm px-3 py-1.5 text-left font-ui text-sm transition-colors ${
+							className={`shrink-0 whitespace-nowrap rounded-sm px-3 py-1.5 text-left font-ui text-sm transition-colors ${
 								active === s.id
 									? "bg-accent text-foreground"
 									: "text-muted-foreground hover:bg-accent hover:text-foreground"

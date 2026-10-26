@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { MenuShell } from "@/components/menu-shell";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
 import type { ChatDeleteMode } from "@/src/core";
-import { DumbbellIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, PlusIcon, SearchIcon, SettingsIcon } from "lucide-react";
+import { DumbbellIcon, EllipsisIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, PlusIcon, SearchIcon, SettingsIcon } from "lucide-react";
 import { ActivitySection } from "@/components/activity-dock";
 import { CoverageMenuBlock } from "@/components/extraction-coverage";
 import { LhMark } from "@/components/lh-mark";
@@ -84,9 +84,16 @@ declare global {
 	}
 }
 
-const SidebarContext = createContext<{ open: boolean; toggle: () => void }>({
+/** Phone-sized viewports: the sidebar becomes an overlay drawer instead of
+ *  an inline column (288px would leave the page a sliver). Not persisted —
+ *  the drawer always starts closed and closes on navigation. */
+const MOBILE_QUERY = "(max-width: 767px)";
+
+const SidebarContext = createContext<{ open: boolean; toggle: () => void; mobile: boolean; close: () => void }>({
 	open: false,
 	toggle: () => {},
+	mobile: false,
+	close: () => {},
 });
 
 export function useSidebar() {
@@ -106,6 +113,20 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 	const [open, setOpen] = useState(false);
 	const [narrow, setNarrow] = useState(false);
 	const [mounted, setMounted] = useState(false);
+	const [mobile, setMobile] = useState(false);
+	const [drawerOpen, setDrawerOpen] = useState(false);
+
+	useEffect(() => {
+		if (typeof window.matchMedia !== "function") return;
+		const mq = window.matchMedia(MOBILE_QUERY);
+		const sync = () => {
+			setMobile(mq.matches);
+			setDrawerOpen(false);
+		};
+		sync();
+		mq.addEventListener("change", sync);
+		return () => mq.removeEventListener("change", sync);
+	}, []);
 
 	useEffect(() => {
 		// Electron shell detection (merged chrome, 2026-09-17): keys the
@@ -148,6 +169,10 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 	}, []);
 
 	const toggle = useCallback(() => {
+		if (mobile) {
+			setDrawerOpen((v) => !v);
+			return;
+		}
 		// Opening while narrow (auto-closed, or the user's own closed-at-
 		// narrow): ask the shell to widen to the threshold — the resize
 		// listener flips `narrow` and the sidebar appears. The preference
@@ -163,7 +188,8 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 			localStorage.setItem(STORAGE_KEY, v ? "0" : "1");
 			return !v;
 		});
-	}, [narrow, open]);
+	}, [narrow, open, mobile]);
+	const close = useCallback(() => setDrawerOpen(false), []);
 
 	// ⌘B: the global shortcut dispatches kbdEventForAction("toggle-sidebar")
 	// and the context answers on exactly that name — the shared spelling
@@ -179,7 +205,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 	}, [toggle]);
 
 	return (
-		<SidebarContext.Provider value={{ open: open && !narrow, toggle }}>
+		<SidebarContext.Provider value={{ open: mobile ? drawerOpen : open && !narrow, toggle, mobile, close }}>
 			{/* transitions gated on mount: no slide-in flash on page load */}
 			<div className={cn("flex h-dvh", mounted && "[&_.sidebar-motion]:transition-[width,margin,opacity]")}>{children}</div>
 		</SidebarContext.Provider>
@@ -199,7 +225,8 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
  *  The icon fades with the slot and is clipped by it as it collapses —
  *  no popping in either direction. */
 export function SidebarToggle() {
-	const { open, toggle } = useSidebar();
+	const { open: sidebarOpen, toggle, mobile } = useSidebar();
+	const open = sidebarOpen && !mobile;
 	return (
 		<span
 			className={cn(
@@ -308,7 +335,7 @@ export function SessionRow({
 			onContextMenu={onContextMenu}
 			data-testid={kbdSelected ? "session-row-kbd" : "session-row"}
 			className={cn(
-				"relative mb-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent",
+				"relative mb-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent pointer-coarse:pr-10",
 				active && "bg-accent",
 				kbdSelected && !active && "bg-accent/60 ring-1 ring-border",
 			)}
@@ -390,7 +417,7 @@ export type SessionKindFilter = "teach" | "all" | "practice";
 const KIND_FILTER_KEY = "lh:session-kind-filter";
 
 function SessionsSidebar() {
-	const { open, toggle } = useSidebar();
+	const { open, toggle, mobile, close } = useSidebar();
 	const [chats, setChats] = useState<ChatListItem[] | null>(null);
 	const [query, setQuery] = useState("");
 	const [kindFilter, setKindFilter] = useState<SessionKindFilter>("all");
@@ -645,12 +672,34 @@ function SessionsSidebar() {
 		// freshness (S6) — no interval, nothing standing.
 	}, [open, pathname, refresh]);
 
+	// Mobile drawer: any navigation (session row, new session, home) closes it.
+	useEffect(() => {
+		close();
+	}, [pathname, close]);
+
 	return (
+		<>
+		{mobile && (
+			<div
+				aria-hidden
+				onClick={close}
+				className={cn(
+					"fixed inset-0 z-40 bg-black/60 transition-opacity duration-200",
+					open ? "opacity-100" : "pointer-events-none opacity-0",
+				)}
+			/>
+		)}
 		<aside
-			className={cn("sidebar-motion shrink-0 overflow-hidden duration-200", open ? "w-72" : "w-0")}
+			className={cn(
+				mobile
+					? "fixed inset-y-0 left-0 z-50 w-[min(18rem,85vw)] transition-transform duration-200"
+					: "sidebar-motion shrink-0 overflow-hidden duration-200",
+				mobile ? (open ? "translate-x-0 shadow-2xl" : "-translate-x-full") : open ? "w-72" : "w-0",
+			)}
 			aria-hidden={!open}
+			inert={(mobile && !open) || undefined}
 		>
-			<div className="flex h-full w-72 flex-col border-r bg-background">
+			<div className={cn("flex h-full flex-col border-r bg-background", mobile ? "w-full pb-[env(safe-area-inset-bottom)]" : "w-72")}>
 				{/* LH wordmark — the owner's header; close toggle sits at the edge.
 				    Merged chrome (2026-09-17): in Electron this band is the
 				    window's drag surface and starts after the traffic lights
@@ -823,17 +872,28 @@ function SessionsSidebar() {
 									onCancel={() => setRenamingId(null)}
 								/>
 							) : (
-								<SessionRow
-									key={c.id}
-									chat={c}
-									active={pathname === `/chat/${c.id}`}
-									kbdSelected={i === kbdIndex}
-									onOpen={() => {
-										setKbdIndex(null);
-										router.push(`/chat/${c.id}`);
-									}}
-									onContextMenu={(e) => openContext(e, c)}
-								/>
+								<div key={c.id} className="relative">
+									<SessionRow
+										chat={c}
+										active={pathname === `/chat/${c.id}`}
+										kbdSelected={i === kbdIndex}
+										onOpen={() => {
+											setKbdIndex(null);
+											router.push(`/chat/${c.id}`);
+										}}
+										onContextMenu={(e) => openContext(e, c)}
+									/>
+									{/* Touch screens have no right-click: a visible
+									    trigger for the same Rename / Delete menu. */}
+									<button
+										type="button"
+										aria-label={`Session actions for ${c.title}`}
+										onClick={(e) => openContext(e, c)}
+										className="absolute right-1 top-1/2 hidden size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground pointer-coarse:flex"
+									>
+										<EllipsisIcon className="size-4" />
+									</button>
+								</div>
 							),
 						)
 					)}
@@ -853,7 +913,7 @@ function SessionsSidebar() {
 						<Hint label="Settings" action="open-settings" side="right">
 							<button
 								type="button"
-								onClick={() => openSettings()}
+								onClick={() => { close(); openSettings(); }}
 								data-testid="settings-entry"
 								className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 							>
@@ -939,6 +999,7 @@ function SessionsSidebar() {
 					onDeleted={onDeleted}
 				/>
 			</aside>
+		</>
 	);
 }
 

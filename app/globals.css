@@ -598,3 +598,23 @@ body {
 	outline: 1px solid var(--border);
 	border-radius: 0.25rem;
 }
+
+/* iOS zooms the page into any focused field whose text is under 16px (and
+   some iOS browsers ignore maximum-scale). On touch devices every form
+   control renders at 16px or larger, so focusing never zooms. */
+@media (pointer: coarse) {
+	input,
+	textarea,
+	select,
+	[contenteditable="true"] {
+		font-size: max(16px, 1em) !important;
+	}
+}
+
+/* The app shell never scrolls the document itself; stop scroll gestures
+   from chaining to the browser (iOS pull-to-refresh / rubber-band) when an
+   inner scroller hits its edge. */
+html,
+body {
+	overscroll-behavior: none;
+}

@@ -144,16 +144,18 @@ export function StatsBar({
 				data-testid="stats-summary"
 				className="flex items-center gap-1.5 tabular-nums transition-colors hover:text-foreground"
 			>
+				<span className="hidden items-center gap-1.5 sm:inline-flex">
 				<span data-testid="stats-context">
 					{contextLabel}
 				</span>
 				<span aria-hidden>·</span>
+				</span>
 				<span data-testid="stats-cost">{costLabel}</span>
 			</button>
 				{open && (
 					<div
 						data-testid="stats-detail"
-						className="absolute bottom-full left-1/2 z-40 mb-1.5 w-72 -translate-x-1/2 rounded-xl border bg-card p-3 text-xs shadow-xl"
+						className="absolute bottom-full left-0 z-40 mb-1.5 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl sm:left-1/2 sm:-translate-x-1/2 border bg-card p-3 text-xs shadow-xl"
 					>
 						<div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
 							Session stats
