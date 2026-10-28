@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownIcon, ChevronRightIcon, PlayIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, ChevronRightIcon, PlayIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { finishDictation, isDictationActive, joinDictation, useDictationTarget } from "@/components/dictation";
 import { useEnterSubmits } from "@/components/enter-submits";
@@ -74,6 +74,10 @@ export interface QuestionDockProps {
 	 */
 	reveal?: boolean;
 	onExpand: () => void;
+	/** Fold the open form back to its bar and return to the lesson above it
+	 *  (phones: the form fills the screen and scrolls itself, so reaching
+	 *  the transcript by swiping took a hard fling). */
+	onCollapse?: () => void;
 	onSubmit: (output: QuestionAnswerData) => void;
 	/** Restore only this call's unconfirmed submission after recovery. */
 	initialDraft?: QuestionFormDraft;
@@ -106,6 +110,7 @@ export function QuestionDock({
 	expanded,
 	reveal = false,
 	onExpand,
+	onCollapse,
 	onSubmit,
 	initialDraft,
 	onSaveDraft,
@@ -159,6 +164,7 @@ export function QuestionDock({
 					input={parsed}
 					phase={phase}
 					active={expanded}
+					onCollapse={onCollapse}
 					onSubmit={onSubmit}
 					initialDraft={initialDraft}
 					onSaveDraft={onSaveDraft}
@@ -256,6 +262,7 @@ function QuestionDockForm({
 	input,
 	phase = "probe",
 	active,
+	onCollapse,
 	onSubmit,
 	initialDraft,
 	onSaveDraft,
@@ -563,7 +570,8 @@ function QuestionDockForm({
 			    Capped by the measured column (--dock-max-h; the old fixed 55dvh cut
 			    long questions short — owner round, 2026-10-05). */}
 			<div data-dock-scroll-area="" data-session-find-root="" className="max-h-[var(--dock-max-h,55dvh)] overflow-y-auto px-4 pt-3">
-				<div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+				<div className="mb-1 flex items-start justify-between gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+					<span className="min-w-0">
 					{toolName === "probe"
 						? "Probe"
 						: toolName === "recall"
@@ -576,6 +584,8 @@ function QuestionDockForm({
 										? "Explain"
 											: "Question"}
 					{qd.mode === "multi-select" && " · select all that apply"}
+					</span>
+					{onCollapse && <BackToLesson onClick={onCollapse} />}
 				</div>
 				<div className="mb-3 font-medium">
 					<ToolContentResponse>{qd.question}</ToolContentResponse>
@@ -926,5 +936,21 @@ function QuestionDockForm({
 				</div>
 			</form>
 		</div>
+	);
+}
+
+/** The open form's way back up to the lesson: rides the kind-label row, so
+ *  it costs no height on a phone where every line of the form counts. */
+export function BackToLesson({ onClick }: { onClick: () => void }) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			data-testid="dock-back-to-lesson"
+			className="-mx-1.5 -my-1 flex shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 uppercase tracking-wide transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+		>
+			<ArrowUpIcon className="size-3.5" aria-hidden />
+			Lesson
+		</button>
 	);
 }

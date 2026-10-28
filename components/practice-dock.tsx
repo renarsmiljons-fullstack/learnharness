@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { ChevronRightIcon } from "lucide-react";
+import { BackToLesson } from "@/components/question-dock";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Button } from "@/components/ui/button";
 import { joinDictation, useDictationTarget } from "@/components/dictation";
@@ -38,6 +39,8 @@ export interface PracticeDockProps {
 	/** Collapse state, owned by the DockOverlay. */
 	expanded: boolean;
 	onExpand: () => void;
+	/** Fold back to the bar and return to the lesson (see QuestionDockProps). */
+	onCollapse?: () => void;
 	/** text — POST {type:"thinking"} (one lane; the register is read from the text). */
 	onSubmit: (text: string) => void;
 	/** Escape in the thinking field stops dictation (threaded from the page). */
@@ -49,7 +52,7 @@ export interface PracticeDockProps {
 	compactionRunning?: boolean;
 }
 
-export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onEscape, compactionRunning = false }: PracticeDockProps) {
+export function PracticeDock({ problemCallId, input, expanded, onExpand, onCollapse, onSubmit, onEscape, compactionRunning = false }: PracticeDockProps) {
 	const [thinking, setThinking] = useState("");
 	// Ref MIRRORS the field ("nothing gets lost", the question-dock
 	// discipline): a submit resuming after `await finishDictation()` reads
@@ -107,7 +110,10 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 			    markdown + LaTeX rendered, capped by the measured column
 			    (--dock-max-h; the old fixed 40vh cut long problems short). */}
 			<div data-dock-scroll-area="" className="max-h-[var(--dock-max-h,40vh)] overflow-y-auto px-4 pt-3 pb-2">
-				<div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Problem</div>
+				<div className="mb-1 flex items-start justify-between gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+					<span>Problem</span>
+					{onCollapse && <BackToLesson onClick={onCollapse} />}
+				</div>
 				<div className="lh-prose text-[15px]">
 					<ToolContentResponse>{input.statement}</ToolContentResponse>
 				</div>

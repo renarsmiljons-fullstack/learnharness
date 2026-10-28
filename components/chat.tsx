@@ -2033,10 +2033,14 @@ function DockOverlay({
 	// the transcript as if it had opened. Resetting here means the paint
 	// measures the bar, the reserve keeps the composer's height, and the
 	// only motion is the teaching text itself.
+	// A learner-chosen fold ("↑ Lesson", below) — held until Answer or
+	// the next question.
+	const heldFoldRef = useRef(false);
 	const prevPendingIdRef = useRef(pendingId);
 	if (pendingId !== prevPendingIdRef.current) {
 		const wasQuestion = prevPendingIdRef.current !== null;
 		prevPendingIdRef.current = pendingId;
+		heldFoldRef.current = false;
 		if (pendingId && requiresReveal) {
 			const arrival = revealArrival(wasQuestion);
 			setExpanded(arrival.expanded);
@@ -2133,7 +2137,9 @@ function DockOverlay({
 	const reserveRef = useRef(0);
 	const offer = useCallback((blockH: number) => {
 		const next = blockH + GRADIENT_H;
-		if (next <= reserveRef.current + 0.5 && pendingRef.current) return;
+		// A learner-held fold ("↑ Lesson") gives the space back: the bottom
+		// is then the end of the lesson, not the open form's blank footprint.
+		if (next <= reserveRef.current + 0.5 && pendingRef.current && !heldFoldRef.current) return;
 		// Stamp growth at the source, including child-only field resizes, so
 		// stick-to-bottom's catch-up is not mistaken for the learner leaving.
 		if (shouldStampGeometryMute(next, reserveRef.current, pendingRef.current)) geometryAtRef.current = Date.now();
@@ -2217,9 +2223,21 @@ function DockOverlay({
 		});
 	};
 	const expandAndReveal = () => {
+		heldFoldRef.current = false;
 		setRevealed(true); // the teach-check invitation was accepted (W5)
 		setExpanded(true);
 		void suppressFoldDuringReveal();
+	};
+	// BACK TO THE LESSON (phones): the open form fills the screen and
+	// scrolls itself, so swiping up to the transcript took a hard fling.
+	// Fold to the bar, leaving the end of the latest message in view just
+	// above it. A fold the learner chose is HELD: reaching the bottom no
+	// longer re-opens this question (that would undo the button at once);
+	// the bar's Answer, or the next question, releases it.
+	const collapseToLesson = () => {
+		heldFoldRef.current = true;
+		setExpanded(false);
+		requestAnimationFrame(() => void scrollToBottom());
 	};
 	const expandAndRevealRef = useRef(expandAndReveal);
 	expandAndRevealRef.current = expandAndReveal;
@@ -2275,7 +2293,7 @@ function DockOverlay({
 				// needs the distance AND stick-to-bottom agreeing the learner
 				// left the bottom.
 				if (d > COLLAPSE_DIST && !expandIntentRef.current && !atBottomRef.current) setExpanded(false);
-			} else if (d < EXPAND_DIST) {
+			} else if (d < EXPAND_DIST && !heldFoldRef.current) {
 				// Teach checks stay collapsed until the learner opens them (W5): the
 				// at-bottom auto-expand would pop the form over the teaching.
 				if (requiresRevealRef.current && !revealedRef.current) return;
@@ -2401,6 +2419,7 @@ function DockOverlay({
 									reveal={revealPending}
 									phase={phase}
 									onExpand={expandAndReveal}
+									onCollapse={collapseToLesson}
 									onSubmit={onSubmitAnswer}
 									initialDraft={initialQuestionDraft}
 									onSaveDraft={onSaveQuestionDraft}
@@ -2417,6 +2436,7 @@ function DockOverlay({
 										setExpanded(true);
 										void suppressFoldDuringReveal();
 									}}
+									onCollapse={collapseToLesson}
 									onSubmit={onSubmitThinking}
 									onEscape={dictationCancel}
 									compactionRunning={compactionRunning}
