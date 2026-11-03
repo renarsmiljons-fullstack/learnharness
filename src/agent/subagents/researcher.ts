@@ -1,4 +1,4 @@
-import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import type { Usage } from "@earendil-works/pi-ai";
 import { createWebTools } from "../tools/web.ts";
 import { createPdfReadTools } from "../tools/pdf-read.ts";
@@ -94,18 +94,33 @@ export interface ResearcherRunOptions {
 export async function runResearcherAgent(prompt: string, opts: ResearcherRunOptions = {}): Promise<string> {
 	const tools = Object.values(createWebTools(opts.search ?? (() => null)));
 	if (opts.pdfDir) tools.push(...Object.values(createPdfReadTools(opts.pdfDir)));
-	const { text } = await runSubagent(tools, {
-		role: "researcher",
-		prompt,
-		engine: opts.engine,
-		systemPrompt: INSTRUCTIONS,
-		maxTurns: 12,
-		abortSignal: opts.abortSignal,
-		onUsage: opts.onUsage,
-		onToolStart: opts.onToolStart,
-		chatId: opts.chatId,
-	});
+	const run = (rest: { prompt: string; messages?: AgentMessage[]; maxTurns: number }) =>
+		runSubagent(tools, {
+			role: "researcher",
+			engine: opts.engine,
+			systemPrompt: INSTRUCTIONS,
+			abortSignal: opts.abortSignal,
+			onUsage: opts.onUsage,
+			onToolStart: opts.onToolStart,
+			chatId: opts.chatId,
+			...rest,
+		});
+	const first = await run({ prompt, maxTurns: RESEARCH_TURNS });
+	if (first.text.trim()) return first.text;
+	// The turn cap ended the run mid-research (last turn was a tool call), so
+	// no brief was written and everything gathered was thrown away. Give the
+	// researcher one more turn to write the brief from what it already has.
+	const transcript: AgentMessage[] = [{ role: "user", content: prompt, timestamp: Date.now() }, ...first.newMessages];
+	const { text } = await run({ prompt: WRAP_UP, messages: transcript, maxTurns: 1 });
 	return text;
 }
+
+/** Model calls the researcher gets before it must write the brief. */
+const RESEARCH_TURNS = 24;
+
+const WRAP_UP =
+	"You have reached the research step limit. Do not call any more tools. " +
+	"Write your final brief now in the required format, from the sources you have already read, " +
+	"and list what you could not verify under Gaps.";
 
 export type ResearcherAgent = ReturnType<typeof runResearcherAgent>;
