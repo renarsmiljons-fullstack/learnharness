@@ -1698,6 +1698,7 @@ export function Chat({
 					practice={activeProblem}
 					compactionRunning={compacting}
 					onSubmitThinking={submitThinking}
+					onSkip={() => setAbortAsk(pending ? "question" : "problem")}
 					chatId={chatId}
 					onModelChange={setSelectedModel}
 					plan={hasPlan ? <PlanMarginalia messages={messages} /> : undefined}
@@ -1932,6 +1933,7 @@ function DockOverlay({
 	practice,
 	compactionRunning,
 	onSubmitThinking,
+	onSkip,
 	requiresReveal,
 	readingThinking,
 	readingThinkingRevision,
@@ -1965,6 +1967,9 @@ function DockOverlay({
 	practice: { toolCallId: string; input: unknown } | null;
 	/** (commit, text) — the practice dock's two submit lanes. */
 	onSubmitThinking: (text: string) => void;
+	/** Opens the same dismiss/discard confirm Esc opens — the touch way to
+	 *  skip the open question or problem and get the composer back. */
+	onSkip: () => void;
 	/** Teach-phase pending question: arrives collapsed behind the reveal button (W5). */
 	requiresReveal: boolean;
 	/** The reading-thinking draft (owner 2026-10-03) — owned by ChatView so
@@ -2420,6 +2425,7 @@ function DockOverlay({
 									phase={phase}
 									onExpand={expandAndReveal}
 									onCollapse={collapseToLesson}
+									onSkip={onSkip}
 									onSubmit={onSubmitAnswer}
 									initialDraft={initialQuestionDraft}
 									onSaveDraft={onSaveQuestionDraft}
@@ -2437,6 +2443,7 @@ function DockOverlay({
 										void suppressFoldDuringReveal();
 									}}
 									onCollapse={collapseToLesson}
+									onSkip={onSkip}
 									onSubmit={onSubmitThinking}
 									onEscape={dictationCancel}
 									compactionRunning={compactionRunning}

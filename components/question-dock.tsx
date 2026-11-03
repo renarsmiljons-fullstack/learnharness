@@ -78,6 +78,9 @@ export interface QuestionDockProps {
 	 *  (phones: the form fills the screen and scrolls itself, so reaching
 	 *  the transcript by swiping took a hard fling). */
 	onCollapse?: () => void;
+	/** Skip the question (the Esc dismissal's confirm) and return to the
+	 *  composer — phones have no Esc key. */
+	onSkip?: () => void;
 	onSubmit: (output: QuestionAnswerData) => void;
 	/** Restore only this call's unconfirmed submission after recovery. */
 	initialDraft?: QuestionFormDraft;
@@ -111,6 +114,7 @@ export function QuestionDock({
 	reveal = false,
 	onExpand,
 	onCollapse,
+	onSkip,
 	onSubmit,
 	initialDraft,
 	onSaveDraft,
@@ -165,6 +169,7 @@ export function QuestionDock({
 					phase={phase}
 					active={expanded}
 					onCollapse={onCollapse}
+					onSkip={onSkip}
 					onSubmit={onSubmit}
 					initialDraft={initialDraft}
 					onSaveDraft={onSaveDraft}
@@ -263,6 +268,7 @@ function QuestionDockForm({
 	phase = "probe",
 	active,
 	onCollapse,
+	onSkip,
 	onSubmit,
 	initialDraft,
 	onSaveDraft,
@@ -585,7 +591,7 @@ function QuestionDockForm({
 											: "Question"}
 					{qd.mode === "multi-select" && " · select all that apply"}
 					</span>
-					{onCollapse && <BackToLesson onClick={onCollapse} />}
+					<DockHeaderActions onCollapse={onCollapse} onSkip={onSkip} />
 				</div>
 				<div className="mb-3 font-medium">
 					<ToolContentResponse>{qd.question}</ToolContentResponse>
@@ -936,6 +942,27 @@ function QuestionDockForm({
 				</div>
 			</form>
 		</div>
+	);
+}
+
+/** The label row's actions: ↑ Lesson, and Skip (confirmed first — it
+ *  discards the question, so a stray tap must not cost it). */
+export function DockHeaderActions({ onCollapse, onSkip }: { onCollapse?: () => void; onSkip?: () => void }) {
+	if (!onCollapse && !onSkip) return null;
+	return (
+		<span className="flex shrink-0 items-center gap-2">
+			{onSkip && (
+				<button
+					type="button"
+					onClick={onSkip}
+					data-testid="dock-skip"
+					className="-my-1 cursor-pointer rounded-md px-1.5 py-1 uppercase tracking-wide transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					Skip
+				</button>
+			)}
+			{onCollapse && <BackToLesson onClick={onCollapse} />}
+		</span>
 	);
 }
 
